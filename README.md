@@ -56,12 +56,12 @@ Install the plugin with your preferred package manager:
     ring = { storage = "sqlite" },
   },
   keys = {
-    { "<leader>p", function() require("telescope").extensions.yank_history.yank_history({ }) end, desc = "Open Yank History" },
+    { "<leader>p", "<cmd>YankyRingHistory<cr>", mode = { "n", "x" }, desc = "Open Yank History" },
     { "y", "<Plug>(YankyYank)", mode = { "n", "x" }, desc = "Yank text" },
     { "p", "<Plug>(YankyPutAfter)", mode = { "n", "x" }, desc = "Put yanked text after cursor" },
     { "P", "<Plug>(YankyPutBefore)", mode = { "n", "x" }, desc = "Put yanked text before cursor" },
-    { "gp", "<Plug>(YankyGPutAfter)", mode = { "n", "x" }, desc = "Put yanked text after selection" },
-    { "gP", "<Plug>(YankyGPutBefore)", mode = { "n", "x" }, desc = "Put yanked text before selection" },
+    { "gp", "<Plug>(YankyGPutAfter)", mode = { "n", "x" }, desc = "Put yanked text after cursor and leave cursor after" },
+    { "gP", "<Plug>(YankyGPutBefore)", mode = { "n", "x" }, desc = "Put yanked text before cursor and leave cursor after" },
     { "<c-p>", "<Plug>(YankyPreviousEntry)", desc = "Select previous entry through yank history" },
     { "<c-n>", "<Plug>(YankyNextEntry)", desc = "Select next entry through yank history" },
     { "]p", "<Plug>(YankyPutIndentAfterLinewise)", desc = "Put indented after cursor (linewise)" },
@@ -106,6 +106,7 @@ Yanky comes with the following defaults:
     cancel_event = "update",
     ignore_registers = { "_" },
     update_register_on_cycle = false,
+    permanent_wrapper = nil,
   },
   picker = {
     select = {
@@ -129,7 +130,7 @@ Yanky comes with the following defaults:
     enabled = true,
   },
   textobj = {
-   enabled = true,
+   enabled = false,
   },
 }
 ```
@@ -199,6 +200,7 @@ require("yanky").setup({
     cancel_event = "update",
     ignore_registers = { "_" },
     update_register_on_cycle = false,
+    permanent_wrapper = nil,
   },
   system_clipboard = {
     sync_with_ring = true,
@@ -260,7 +262,7 @@ Define the event used to cancel ring activation. `update` will cancel ring on
 next buffer update, `move` will cancel ring when moving cursor or content
 changed.
 
-### `ring.ignore_registers `
+### `ring.ignore_registers`
 
 Default: `{ "_" }`
 
@@ -300,6 +302,14 @@ Using the `update_register_on_cycle` option, when you cycle through the ring,
 the contents of the register used to update will be updated with the last
 content cycled.
 
+### `ring.permanent_wrapper`
+
+Default: `nil`
+
+Using the `permanent_wrapper` option, you can set a wrapper that will be used
+for every put action. This is useful if you want to add a treatment to every
+put actions (ex: remove `\r` for wsl support).
+
 ### Commands
 
 You can clear yank history using `YankyClearHistory` command.
@@ -307,26 +317,46 @@ You can clear yank history using `YankyClearHistory` command.
 ## 📜 Yank history picker
 
 This allows you to select an entry in your recorded yank history using default
-`vim.ui.select` neovim prompt (you can use [stevearc/dressing.nvim](https://github.com/stevearc/dressing.nvim/)
-to customize this) or the awesome [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim).
+`vim.ui.select` neovim prompt (you can use [folke/snacks.nvim](https://github.com/folke/snacks.nvim)
+to customize this).
+
+There is also an integration with [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) and [Snacks.picker](https://github.com/folke/snacks.nvim).
 
 It uses the same history as yank ring, so, if you want to increase history size,
 just use [`ring.history_length` option](#ringhistory_length).
 
 See [Integrations](#-integrations) to have a completion with [nvim-cmp](https://github.com/hrsh7th/nvim-cmp).
 
-### Yank history completions
-
-Using [nvim-cmp](https://github.com/hrsh7th/nvim-cmp) and [cmp_yanky](https://github.com/chrisgrieser/cmp_yanky), you can also get suggestions from your yank history as you type in insert mode.
-
-<details>
-<summary>demonstration</summary>
-<img src="https://github.com/chrisgrieser/cmp_yanky/assets/73286100/e1e62358-63d0-4261-88ed-47bb155576d2" alt="showcasing cmp-yanky" width=70%>
-</details>
-
 ### ⚙️ Configuration
 
 To use `vim.ui.select` picker, just call `YankyRingHistory` command.
+
+#### Snacks picker
+
+To use the `yanky` Snacks picker, you must load `yanky` after `snacks.nvim`, the picker will self register.
+Then, you can call `:lua Snacks.picker.yanky()`.
+
+With [lazy.nvim](https://github.com/folke/lazy.nvim) :
+
+```lua
+{
+  "gbprod/yanky.nvim",
+  opts = { },
+  dependencies = { "folke/snacks.nvim" },
+  keys = {
+    {
+      "<leader>p",
+      function()
+          Snacks.picker.yanky()
+      end,
+      mode = { "n", "x" },
+      desc = "Open Yank History",
+    },
+  }
+}
+```
+
+#### Telescope
 
 To use the `yank_history` Telescope picker, register `yank_history` as a
 Telescope extension in your Neovim config file.
@@ -454,7 +484,7 @@ require("yanky.telescope.mapping").special_put("YankyPutAfterCharwiseJoined")
 This will give you a visual feedback on put and yank text
 by highlighting this.
 
-### Configuration
+###  Configuration
 
 ```lua
 require("yanky").setup({
@@ -673,7 +703,7 @@ have to enable it in settings and set a keymap.
 ```lua
 require("yanky").setup({
   textobj = {
-    enabled = true,
+    enabled = false,
   },
 })
 ```
@@ -681,7 +711,7 @@ require("yanky").setup({
 ### ⌨️ Mappings
 
 ```lua
-vim.keymap.set({ "o", "x" }, "lp", function()
+vim.keymap.set({ "o", "x" }, "iy", function()
   require("yanky.textobj").last_put()
 end, {})
 ```
@@ -706,7 +736,9 @@ require("substitute").setup({
   on_substitute = require("yanky.integration").substitute(),
 })
 ```
+
 or
+
 ```lua
 opts = {
   on_substitute = function() require("yanky.integration").substitute() end,
@@ -780,6 +812,22 @@ for key, putAction in pairs({
     yanky_hydra:activate()
   end)
 end
+```
+
+</details>
+
+<details>
+  <summary><b>windows wsl</b></summary>
+When pasting text from windows system clipboard, there's always a ^M at the end
+of each line. Adding a permeant wrapper to remove these ^M characters when pasting
+will allows you to paste text from windows system clipboard without any issues.
+
+```lua
+require("yanky").setup({
+  ring = {
+    permanent_wrapper = require("yanky.wrappers").remove_carriage_return,
+  },
+})
 ```
 
 </details>

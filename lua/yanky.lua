@@ -59,6 +59,10 @@ function yanky.setup(options)
   end
 
   vim.api.nvim_create_user_command("YankyClearHistory", yanky.clear_history, {})
+
+  if Snacks then
+    Snacks.picker.sources.yanky = require("yanky.sources.snacks").config
+  end
 end
 
 function yanky.init_history()
@@ -98,6 +102,9 @@ function yanky.put(type, is_visual, callback)
   yanky.ring.state = nil
   yanky.ring.is_cycling = false
   yanky.ring.callback = callback or do_put
+  if yanky.config.options.ring.permanent_wrapper ~= nil then
+    yanky.ring.callback = yanky.config.options.ring.permanent_wrapper(yanky.ring.callback)
+  end
 
   -- On Yank event is not triggered when put from expression register,
   -- To allows cycling, we must store value here
@@ -108,7 +115,7 @@ function yanky.put(type, is_visual, callback)
     yanky.history.push(entry)
   end
 
-  yanky.init_ring(type, vim.v.register, vim.v.count, is_visual, yanky.ring.callback)
+  yanky.init_ring(type, utils.get_register(), vim.v.count, is_visual, yanky.ring.callback)
 end
 
 function yanky.clear_ring()

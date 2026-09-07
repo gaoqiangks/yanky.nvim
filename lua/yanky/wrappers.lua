@@ -77,12 +77,16 @@ function wrappers.change(change, next)
       next(state, callback)
     end
 
-    -- local line_len = vim.api.nvim_get_current_line():len()
+    local mark_start = vim.api.nvim_buf_get_mark(0, "[")
+    local mark_end = vim.api.nvim_buf_get_mark(0, "]")
 
     local cursor_pos = vim.api.nvim_win_get_cursor(0)
     vim.cmd(string.format("silent '[,']normal! %s", change))
     vim.api.nvim_win_set_cursor(0, cursor_pos)
     vim.cmd(string.format("silent normal! %s", (state.type == "gp" or state.type == "gP") and "0" or "^"))
+
+    vim.api.nvim_buf_set_mark(0, "[", mark_start[1], mark_start[2], {})
+    vim.api.nvim_buf_set_mark(0, "]", mark_end[1], mark_end[2], {})
   end
 end
 
@@ -95,6 +99,25 @@ function wrappers.set_cursor_pos(pos, next)
     end
 
     vim.cmd(string.format("silent normal! %s", pos))
+  end
+end
+
+function wrappers.remove_carriage_return(next)
+  return function(state, callback)
+    local body = vim.fn.getreg(state.register)
+    local type = vim.fn.getregtype(state.register)
+
+    local reformated_body = body:gsub("\r", "")
+
+    vim.fn.setreg(state.register, reformated_body, type)
+
+    if nil == next then
+      callback(state)
+    else
+      next(state, callback)
+    end
+
+    vim.fn.setreg(state.register, body, type)
   end
 end
 
