@@ -9,7 +9,9 @@ function history.setup()
   history.storage = require("yanky.storage." .. history.config.storage)
   if false == history.storage.setup() then
     history.storage = require("yanky.storage.memory")
+    history.storage.setup()
   end
+  history.position = 1
 end
 
 function history.push(item)
@@ -31,18 +33,15 @@ end
 
 function history.sync_with_numbered_registers()
   if history.config.sync_with_numbered_registers then
-    for i = 1, math.min(history.storage.length(), 9) do
-      local reg = history.storage.get(i)
+    local entries = history.storage.all(9)
+    for i = 1, math.min(#entries, 9) do
+      local reg = entries[i]
       vim.fn.setreg(i, reg.regcontents, reg.regtype)
     end
   end
 end
 
 function history.first()
-  if history.storage.length() <= 0 then
-    return nil
-  end
-
   return history.storage.get(1)
 end
 
@@ -52,17 +51,18 @@ end
 
 function history.next()
   local new_position = history.position + 1
-  if new_position > history.storage.length() then
+  local item = history.storage.get(new_position)
+  if item == nil then
     return nil
   end
 
   history.position = new_position
 
-  return history.storage.get(history.position)
+  return item
 end
 
 function history.previous()
-  if history.position == 1 then
+  if history.position <= 1 then
     return nil
   end
 

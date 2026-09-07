@@ -1,5 +1,17 @@
 local utils = {}
 
+-- Execute native editing commands synchronously, without parsing an Ex script.
+-- Keeping :normal semantics preserves registers, undo and dot-repeat behavior.
+function utils.normal(keys, range)
+  vim.api.nvim_cmd({
+    cmd = "normal",
+    bang = true,
+    args = { keys },
+    range = range,
+    mods = { silent = true },
+  }, {})
+end
+
 function utils.is_osc52_active()
   if not vim.g.clipboard then
     return false
@@ -70,11 +82,24 @@ function utils.get_register_info(register)
   }
 end
 
+function utils.register_info_from_lines(lines, regtype)
+  return {
+    regcontents = table.concat(lines, "\n") .. (regtype == "V" and "\n" or ""),
+    regtype = regtype,
+  }
+end
+
 function utils.use_temporary_register(register, register_info, callback)
   local current_register_info = utils.get_register_info(register)
+  if not current_register_info then
+    error("Unable to read register " .. register)
+  end
   vim.fn.setreg(register, register_info.regcontents, register_info.regtype)
-  callback()
+  local ok, err = pcall(callback)
   vim.fn.setreg(register, current_register_info.regcontents, current_register_info.regtype)
+  if not ok then
+    error(err, 0)
+  end
 end
 
 return utils

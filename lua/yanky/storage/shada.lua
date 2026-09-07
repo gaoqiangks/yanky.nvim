@@ -5,7 +5,8 @@ function shada.setup()
 end
 
 function shada.push(item)
-  local copy = vim.deepcopy(vim.g.YANKY_HISTORY)
+  -- Reading vim.g already creates a Lua copy of the Vimscript value.
+  local copy = vim.g.YANKY_HISTORY or {}
   table.insert(copy, 1, item)
 
   if #copy > shada.config.history_length then
@@ -16,27 +17,15 @@ function shada.push(item)
 end
 
 function shada.get(n)
-  if nil == vim.g.YANKY_HISTORY then
-    vim.g.YANKY_HISTORY = {}
-  end
-
-  return vim.g.YANKY_HISTORY[n]
+  return shada.all()[n]
 end
 
 function shada.length()
-  if nil == vim.g.YANKY_HISTORY then
-    vim.g.YANKY_HISTORY = {}
-  end
-
-  return #vim.g.YANKY_HISTORY
+  return #shada.all()
 end
 
 function shada.all()
-  if nil == vim.g.YANKY_HISTORY then
-    vim.g.YANKY_HISTORY = {}
-  end
-
-  return vim.g.YANKY_HISTORY
+  return vim.g.YANKY_HISTORY or {}
 end
 
 function shada.clear()
@@ -44,7 +33,7 @@ function shada.clear()
 end
 
 function shada.delete(index)
-  local copy = vim.deepcopy(vim.g.YANKY_HISTORY)
+  local copy = vim.g.YANKY_HISTORY or {}
   table.remove(copy, index)
 
   vim.g.YANKY_HISTORY = copy

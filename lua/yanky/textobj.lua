@@ -1,3 +1,4 @@
+local utils = require("yanky.utils")
 local textobj = {
   state = nil,
 }
@@ -11,20 +12,20 @@ local function get_region(regtype)
     start_row = start[1],
     start_col = "V" ~= regtype and start[2] or 0,
     end_row = finish[1],
-    end_col = "V" ~= regtype and finish[2] or vim.fn.col("$"),
+    end_col = "V" ~= regtype and finish[2] or (#vim.api.nvim_get_current_line() + 1),
   }
 end
 
 local function is_visual_mode()
-  return nil ~= vim.fn.mode():find("v")
+  return nil ~= vim.api.nvim_get_mode().mode:find("v")
 end
 
 local function set_selection(startpos, endpos)
   vim.api.nvim_win_set_cursor(0, startpos)
   if is_visual_mode() then
-    vim.cmd("normal! o")
+    utils.normal("o")
   else
-    vim.cmd("normal! v")
+    utils.normal("v")
   end
   vim.api.nvim_win_set_cursor(0, endpos)
 end

@@ -1,3 +1,4 @@
+local utils = require("yanky.utils")
 local wrappers = {}
 
 function wrappers.linewise(next)
@@ -81,9 +82,9 @@ function wrappers.change(change, next)
     local mark_end = vim.api.nvim_buf_get_mark(0, "]")
 
     local cursor_pos = vim.api.nvim_win_get_cursor(0)
-    vim.cmd(string.format("silent '[,']normal! %s", change))
+    utils.normal(change, { mark_start[1], mark_end[1] })
     vim.api.nvim_win_set_cursor(0, cursor_pos)
-    vim.cmd(string.format("silent normal! %s", (state.type == "gp" or state.type == "gP") and "0" or "^"))
+    utils.normal((state.type == "gp" or state.type == "gP") and "0" or "^")
 
     vim.api.nvim_buf_set_mark(0, "[", mark_start[1], mark_start[2], {})
     vim.api.nvim_buf_set_mark(0, "]", mark_end[1], mark_end[2], {})
@@ -98,7 +99,7 @@ function wrappers.set_cursor_pos(pos, next)
       next(state, callback)
     end
 
-    vim.cmd(string.format("silent normal! %s", pos))
+    utils.normal(pos)
   end
 end
 

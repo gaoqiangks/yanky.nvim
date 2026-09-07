@@ -67,8 +67,10 @@ function picker.actions.set_register(register)
 end
 
 function picker.actions.special_put(name, is_visual)
-  if "" == vim.fn.maparg(string.format("<Plug>(%s)", name), "n") then
-    vim.notify("Invalid special put " .. type, vim.log.levels.ERROR)
+  local mode = is_visual and "x" or "n"
+  local mapping = vim.fn.maparg(string.format("<Plug>(%s)", name), mode, false, true)
+  if type(mapping.callback) ~= "function" then
+    vim.notify("Invalid special put " .. name, vim.log.levels.ERROR)
     return
   end
 
@@ -78,7 +80,7 @@ function picker.actions.special_put(name, is_visual)
     end
 
     utils.use_temporary_register(utils.get_default_register(), next_content, function()
-      vim.fn.maparg(string.format("<Plug>(%s)", name), is_visual and "x" or "n", false, true).callback()
+      mapping.callback()
     end)
   end
 end

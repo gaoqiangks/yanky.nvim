@@ -16,39 +16,55 @@ function sqlite.setup()
     return false
   end
 
-  vim.fn.mkdir(string.match(sqlite.config.storage_path, "(.*[/\\])"), "p")
+  local ok, err = pcall(function()
+    local directory = string.match(sqlite.config.storage_path, "(.*[/\\])")
+    if directory then
+      vim.fn.mkdir(directory, "p")
+    end
+    sqlite.db = connection:open(sqlite.config.storage_path)
+    assert(sqlite.db, "Error in opening DB")
 
-  sqlite.db = connection:open(sqlite.config.storage_path)
-  if not sqlite.db then
-    vim.notify("Error in opening DB", vim.log.levels.ERROR)
-    return
+    if not sqlite.db:exists("history") then
+      sqlite.db:create("history", {
+        id = { "integer", "primary", "key", "autoincrement" },
+        regcontents = "text",
+        regtype = "text",
+        filetype = "text",
+      })
+    end
+    sqlite.db:close()
+  end)
+  if not ok then
+    if sqlite.db then
+      pcall(sqlite.db.close, sqlite.db)
+    end
+    sqlite.db = nil
+    vim.notify("Error initializing yanky SQLite storage: " .. tostring(err), vim.log.levels.ERROR)
+    return false
   end
-
-  if not sqlite.db:exists("history") then
-    sqlite.db:create("history", {
-      id = { "integer", "primary", "key", "autoincrement" },
-      regcontents = "text",
-      regtype = "text",
-      filetype = "text",
-    })
-  end
-
-  sqlite.db:close()
 end
 
 function sqlite.push(item)
   sqlite.db:with_open(function()
-    sqlite.db:eval(
-      "INSERT INTO history (filetype, regcontents, regtype) VALUES (:filetype, :regcontents, :regtype)",
-      item
-    )
-
-    sqlite.db:eval(
-      string.format(
-        "DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY id DESC LIMIT %s)",
-        sqlite.config.history_length
+    -- Insert and trim atomically, paying for only one durable commit per yank.
+    sqlite.db:eval("BEGIN IMMEDIATE")
+    local ok, err = pcall(function()
+      sqlite.db:eval(
+        "INSERT INTO history (filetype, regcontents, regtype) VALUES (:filetype, :regcontents, :regtype)",
+        item
       )
-    )
+      sqlite.db:eval(
+        string.format(
+          "DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY id DESC LIMIT %s)",
+          sqlite.config.history_length
+        )
+      )
+      sqlite.db:eval("COMMIT")
+    end)
+    if not ok then
+      pcall(sqlite.db.eval, sqlite.db, "ROLLBACK")
+      error(err, 0)
+    end
   end)
 end
 
@@ -64,9 +80,9 @@ function sqlite.length()
   end)
 end
 
-function sqlite.all()
+function sqlite.all(limit)
   return sqlite.db:with_open(function()
-    return sqlite.db:select("history", { order_by = { desc = "id" } })
+    return sqlite.db:select("history", { order_by = { desc = "id" }, limit = limit and { limit, 0 } })
   end)
 end
 

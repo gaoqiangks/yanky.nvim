@@ -1,4 +1,4 @@
-local highlight = {}
+local highlight = { generation = 0 }
 
 -- Use the non-deprecated `vim.hl` if available.
 vim.hl = vim.hl or vim.highlight
@@ -11,7 +11,22 @@ local function hl_op(opts)
   return vim.hl.on_yank(opts)
 end
 
+local function clear_put()
+  if highlight.buffer and vim.api.nvim_buf_is_valid(highlight.buffer) then
+    vim.api.nvim_buf_clear_namespace(highlight.buffer, highlight.hl_put, 0, -1)
+  end
+  highlight.buffer = nil
+end
+
 function highlight.setup()
+  highlight.generation = highlight.generation + 1
+  if highlight.timer then
+    highlight.timer:stop()
+    highlight.timer:close()
+    highlight.timer = nil
+  end
+  clear_put()
+  local group = vim.api.nvim_create_augroup("YankyHighlight", { clear = true })
   highlight.config = require("yanky.config").options.highlight
   if highlight.config.on_put then
     highlight.hl_put = vim.api.nvim_create_namespace("yanky.put")
@@ -22,6 +37,7 @@ function highlight.setup()
 
   if highlight.config.on_yank then
     vim.api.nvim_create_autocmd("TextYankPost", {
+      group = group,
       pattern = "*",
       callback = function(_)
         pcall(hl_op, { higroup = "YankyYanked", timeout = highlight.config.timer })
@@ -50,7 +66,10 @@ function highlight.highlight_put(state)
   end
 
   highlight.timer:stop()
-  vim.api.nvim_buf_clear_namespace(0, highlight.hl_put, 0, -1)
+  clear_put()
+  highlight.generation = highlight.generation + 1
+  local generation = highlight.generation
+  highlight.buffer = vim.api.nvim_get_current_buf()
 
   local region = get_region()
 
@@ -67,7 +86,9 @@ function highlight.highlight_put(state)
     highlight.config.timer,
     0,
     vim.schedule_wrap(function()
-      vim.api.nvim_buf_clear_namespace(0, highlight.hl_put, 0, -1)
+      if highlight.generation == generation then
+        clear_put()
+      end
     end)
   )
 end

@@ -4,7 +4,7 @@ local system_clipboard = require("yanky.system_clipboard")
 local preserve_cursor = require("yanky.preserve_cursor")
 local picker = require("yanky.picker")
 local textobj = require("yanky.textobj")
-local config  = require("yanky.config")
+local config = require("yanky.config")
 
 local yanky = {}
 
@@ -29,6 +29,7 @@ yanky.type = {
 }
 
 function yanky.setup(options)
+  yanky.clear_ring()
   yanky.config = require("yanky.config")
   yanky.config.setup(options)
 
@@ -72,13 +73,13 @@ end
 
 local function do_put(state, _)
   if state.is_visual then
-    vim.cmd([[execute "normal! \<esc>"]])
+    utils.normal("\027")
   end
 
   local ok, val = pcall(
-    vim.cmd,
+    utils.normal,
     string.format(
-      'silent normal! %s"%s%s%s',
+      '%s"%s%s%s',
       state.is_visual and "gv" or "",
       state.register ~= "=" and state.register or "=" .. vim.api.nvim_replace_termcodes("<CR>", true, false, true),
       state.count,
@@ -99,8 +100,7 @@ function yanky.put(type, is_visual, callback)
     return
   end
 
-  yanky.ring.state = nil
-  yanky.ring.is_cycling = false
+  yanky.clear_ring()
   yanky.ring.callback = callback or do_put
   if yanky.config.options.ring.permanent_wrapper ~= nil then
     yanky.ring.callback = yanky.config.options.ring.permanent_wrapper(yanky.ring.callback)
@@ -128,21 +128,35 @@ function yanky.clear_ring()
 end
 
 function yanky.attach_cancel()
+  local state = yanky.ring.state
+  local buffer = vim.api.nvim_get_current_buf()
   if yanky.config.options.ring.cancel_event == "move" then
-    yanky.ring.state.augroup = vim.api.nvim_create_augroup("YankyRingClear", { clear = true })
+    state.augroup = vim.api.nvim_create_augroup("YankyRingClear", { clear = true })
+    local token = {}
+    state.cancel_token = token
     vim.schedule(function()
+      if yanky.ring.state ~= state or state.cancel_token ~= token then
+        return
+      end
       vim.api.nvim_create_autocmd("CursorMoved", {
-        group = yanky.ring.state.augroup,
-        buffer = 0,
+        group = state.augroup,
+        buffer = buffer,
         callback = yanky.clear_ring,
       })
     end)
-  else
+  elseif not state.cancel_attached then
+    state.cancel_attached = true
     vim.api.nvim_buf_attach(0, false, {
       on_lines = function(_)
-        yanky.clear_ring()
+        state.cancel_attached = false
+        if yanky.ring.state == state then
+          yanky.clear_ring()
+        end
 
         return true
+      end,
+      on_detach = function()
+        state.cancel_attached = false
       end,
     })
   end
@@ -212,7 +226,7 @@ function yanky.cycle(direction)
 
     local reg = utils.get_register_info(yanky.ring.state.register)
     local first = yanky.history.first()
-    if nil ~= first and reg.regcontents == first.regcontents and reg.regtype == first.regtype then
+    if reg ~= nil and first ~= nil and reg.regcontents == first.regcontents and reg.regtype == first.regtype then
       yanky.history.skip()
     end
   end
@@ -241,7 +255,7 @@ function yanky.cycle(direction)
 
   utils.use_temporary_register(yanky.ring.state.register, next_content, function()
     if new_state.use_repeat then
-      local ok, val = pcall(vim.cmd, "silent normal! u.")
+      local ok, val = pcall(utils.normal, "u.")
       if not ok then
         vim.notify(val, vim.log.levels.WARN)
         yanky.attach_cancel()
@@ -249,7 +263,7 @@ function yanky.cycle(direction)
       end
       highlight.highlight_put(new_state)
     else
-      local ok, val = pcall(vim.cmd, "silent normal! u")
+      local ok, val = pcall(utils.normal, "u")
       if not ok then
         vim.notify(val, vim.log.levels.WARN)
         yanky.attach_cancel()
@@ -278,7 +292,9 @@ function yanky.on_yank()
   if vim.v.event.visual and vim.v.event.operator == "d" and yanky.ring.is_cycling then
     return
   end
-  local entry = utils.get_register_info(vim.v.event.regname)
+  -- The event already contains the yanked text. Reading the register again
+  -- can invoke a slow external clipboard provider (especially on WSL).
+  local entry = utils.register_info_from_lines(vim.v.event.regcontents, vim.v.event.regtype)
   entry.filetype = vim.bo.filetype
 
   yanky.history.push(entry)

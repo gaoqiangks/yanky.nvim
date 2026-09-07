@@ -14,7 +14,7 @@ local function setup()
   yanky.setup({ ring = { storage = "memory" } })
 
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_command("buffer " .. buf)
+  vim.api.nvim_set_current_buf(buf)
 
   vim.api.nvim_buf_set_lines(0, 0, -1, true, { "Lorem", "ipsum", "dolor", "sit", "amet" })
 end
@@ -52,6 +52,23 @@ describe("Put in charwise mode", function()
     execute_keys('"ap')
 
     assert.are.same({ "Lorem", "ipsREGISTREDum", "dolor", "sit", "amet" }, get_buf_lines())
+  end)
+
+  it("should paste the evaluated expression register", function()
+    execute_keys('"="a|b"<CR>p')
+
+    assert.are.same({ "La|borem", "ipsum", "dolor", "sit", "amet" }, get_buf_lines())
+  end)
+
+  it("should support dot-repeat and undo after a mapped put", function()
+    -- Separate buffer setup from the edits made by this headless invocation.
+    execute_keys("i<C-G>u<esc>")
+    execute_keys("yw")
+    execute_keys("jp")
+    execute_keys(".")
+    assert.are.same({ "Lorem", "iLoremLorempsum", "dolor", "sit", "amet" }, get_buf_lines())
+    execute_keys("u")
+    assert.are.same({ "Lorem", "ipsum", "dolor", "sit", "amet" }, get_buf_lines())
   end)
 end)
 

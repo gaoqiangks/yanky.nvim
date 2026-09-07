@@ -14,7 +14,7 @@ local function setup()
   yanky.setup({ ring = { storage = "memory" } })
 
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_command("buffer " .. buf)
+  vim.api.nvim_set_current_buf(buf)
 
   vim.api.nvim_buf_set_lines(0, 0, -1, true, {
     "void test() {",
@@ -27,17 +27,17 @@ local function setup()
     "}",
   })
 
-  vim.cmd("set ft=c")
+  vim.bo.filetype = "c"
 end
 
 describe("Special Put", function()
   before_each(setup)
 
   it("should PutAfterFilter", function()
-    vim.cmd("5")
+    vim.api.nvim_win_set_cursor(0, { 5, 0 })
     execute_keys("2yy")
-    vim.cmd("3")
-    vim.cmd('execute "normal \\<Plug>(YankyPutAfterFilter)"')
+    vim.api.nvim_win_set_cursor(0, { 3, 0 })
+    execute_keys("<Plug>(YankyPutAfterFilter)")
     assert.are.same({
       "void test() {",
       "    int a = 1;",
@@ -55,10 +55,10 @@ describe("Special Put", function()
   end)
 
   it("should GPutBeforeFilter", function()
-    vim.cmd("5")
+    vim.api.nvim_win_set_cursor(0, { 5, 0 })
     execute_keys("2yy")
-    vim.cmd("4")
-    vim.cmd('execute "normal \\<Plug>(YankyGPutBeforeFilter)"')
+    vim.api.nvim_win_set_cursor(0, { 4, 0 })
+    execute_keys("<Plug>(YankyGPutBeforeFilter)")
     assert.are.same({
       "void test() {",
       "    int a = 1;",

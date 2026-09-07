@@ -23,11 +23,13 @@ function M.load(plugin)
 end
 
 function M.setup()
-  vim.cmd([[set runtimepath=$VIMRUNTIME]])
+  vim.opt.shadafile = "NONE"
+  vim.opt.runtimepath = { vim.env.VIMRUNTIME }
   vim.opt.runtimepath:append(M.root())
-  vim.opt.packpath = { M.root(".spec/site") }
+  vim.opt.packpath = { M.root(".spec/site"), vim.env.VIMRUNTIME }
 
   M.load("nvim-lua/plenary.nvim")
+  M.load("kkharji/sqlite.lua")
 
   vim.api.nvim_set_option("clipboard", "")
 

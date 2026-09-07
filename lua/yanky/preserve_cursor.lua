@@ -1,4 +1,4 @@
-local preserve_cursor = {}
+local preserve_cursor = { attached_buffers = {} }
 
 preserve_cursor.state = {
   cusor_position = nil,
@@ -7,6 +7,7 @@ preserve_cursor.state = {
 
 function preserve_cursor.setup()
   preserve_cursor.config = require("yanky.config").options.preserve_cursor_position
+  preserve_cursor.state = {}
 end
 
 function preserve_cursor.on_yank()
@@ -33,16 +34,25 @@ function preserve_cursor.yank()
   preserve_cursor.state = {
     cusor_position = vim.fn.getpos("."),
     win_state = vim.fn.winsaveview(),
+    buffer = vim.api.nvim_get_current_buf(),
   }
 
-  vim.api.nvim_buf_attach(0, false, {
+  local buffer = preserve_cursor.state.buffer
+  if preserve_cursor.attached_buffers[buffer] then
+    return
+  end
+  preserve_cursor.attached_buffers[buffer] = true
+  vim.api.nvim_buf_attach(buffer, false, {
     on_lines = function()
-      preserve_cursor.state = {
-        cusor_position = nil,
-        win_state = nil,
-      }
-
-      return true
+      if preserve_cursor.state.buffer == buffer then
+        preserve_cursor.state = {}
+      end
+    end,
+    on_detach = function()
+      preserve_cursor.attached_buffers[buffer] = nil
+      if preserve_cursor.state.buffer == buffer then
+        preserve_cursor.state = {}
+      end
     end,
   })
 end

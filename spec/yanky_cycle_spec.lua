@@ -14,7 +14,7 @@ local function setup()
   yanky.setup({ ring = { storage = "memory" } })
 
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_command("buffer " .. buf)
+  vim.api.nvim_set_current_buf(buf)
 
   vim.api.nvim_buf_set_lines(0, 0, -1, true, { "Lorem", "ipsum", "dolor", "sit", "amet" })
   execute_keys("i<BS><C-G>u<esc>") -- Breaks undo sequence, don't know why I should do that
